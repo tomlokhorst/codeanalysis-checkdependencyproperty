@@ -16,5 +16,5 @@ Installing
 To run this extension:
 
 1. Install [Roslyn](http://msdn.microsoft.com/en-US/roslyn)
-2. Install the [extension .vsix](https://github.com/tomlokhorst/codeanalysis-dependencyproperty/raw/master/extension/DependencyProperty.vsix)
+2. Install the [extension .vsix](https://github.com/tomlokhorst/codeanalysis-checkdependencyproperty/raw/master/extension/CheckDependencyProperty.vsix)
 
