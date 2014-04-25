@@ -79,6 +79,7 @@ namespace CheckDependencyProperty
       if (classDecl == null) return;
 
       var argumentList = getArgumentList(field, semanticModel);
+      if (argumentList == null) return;
 
       Action<Diagnostic> diagnostic = (d) =>
         {
