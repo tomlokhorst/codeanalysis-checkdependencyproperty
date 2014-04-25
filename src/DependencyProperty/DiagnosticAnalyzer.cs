@@ -16,10 +16,6 @@ namespace DependencyPropertyNullable
     internal const string DiagnosticId = "DependencyProperty";
     internal const string Category = "Conventions";
 
-    internal const string OwnerTypeDescription = "Owner type does not match";
-    internal const string OwnerTypeMessageFormat = "Specified ownerType '{0}' doesn't match enclosing type '{1}'";
-    internal static DiagnosticDescriptor OwnerTypeRule = new DiagnosticDescriptor(DiagnosticId, OwnerTypeDescription, OwnerTypeMessageFormat, Category, DiagnosticSeverity.Warning);
-
     internal const string NameExistsDescription = "Property name doesn't exist";
     internal const string NameExistsMessageFormat = "There is no property named '{0}' in this class";
     internal static DiagnosticDescriptor NameExistsRule = new DiagnosticDescriptor(DiagnosticId, NameExistsDescription, NameExistsMessageFormat, Category, DiagnosticSeverity.Warning);
@@ -27,6 +23,14 @@ namespace DependencyPropertyNullable
     internal const string NameDuplicateDescription = "DependencyProperty name is duplicate";
     internal const string NameDuplicateMessageFormat = "There is another DependencyProperty also named '{0}'";
     internal static DiagnosticDescriptor NameDuplicateRule = new DiagnosticDescriptor(DiagnosticId, NameDuplicateDescription, NameDuplicateMessageFormat, Category, DiagnosticSeverity.Warning);
+
+    internal const string PropertyTypeDescription = "Property type does not match";
+    internal const string PropertyTypeMessageFormat = "Specified propertyType '{0}' doesn't match type '{1}' of property '{2}'";
+    internal static DiagnosticDescriptor PropertyTypeRule = new DiagnosticDescriptor(DiagnosticId, PropertyTypeDescription, PropertyTypeMessageFormat, Category, DiagnosticSeverity.Warning);
+
+    internal const string OwnerTypeDescription = "Owner type does not match";
+    internal const string OwnerTypeMessageFormat = "Specified ownerType '{0}' doesn't match enclosing type '{1}'";
+    internal static DiagnosticDescriptor OwnerTypeRule = new DiagnosticDescriptor(DiagnosticId, OwnerTypeDescription, OwnerTypeMessageFormat, Category, DiagnosticSeverity.Warning);
 
     public ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
     {
@@ -74,6 +78,9 @@ namespace DependencyPropertyNullable
 
       checkNameExists(classDecl, argumentList, addDiagnostic, semanticModel);
       checkNameDuplicate(classDecl, field, argumentList, addDiagnostic, semanticModel);
+
+      checkPropertyType(classDecl, argumentList, addDiagnostic, semanticModel);
+
       checkOwnerType(classDecl, argumentList, addDiagnostic, semanticModel);
     }
 
@@ -116,6 +123,28 @@ namespace DependencyPropertyNullable
       if (followsConvention) return;
 
       var diagnostic = Diagnostic.Create(NameDuplicateRule, stringLiteral.GetLocation(), name);
+      addDiagnostic(diagnostic);
+    }
+
+    private void checkPropertyType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
+    {
+      var stringLiteral = registerArgumentList.Arguments[0].Expression as LiteralExpressionSyntax;
+      if (stringLiteral == null || !stringLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return;
+
+      var name = stringLiteral.Token.ValueText;
+
+      var typeOf = registerArgumentList.Arguments[1].Expression as TypeOfExpressionSyntax;
+      if (typeOf == null) return;
+      var typeOfType = semanticModel.GetTypeInfo(typeOf.Type).Type;
+
+      var property = classDecl.Members.OfType<PropertyDeclarationSyntax>().FirstOrDefault(p => p.Identifier.ValueText == name);
+      if (property == null) return;
+      var propertyType = semanticModel.GetTypeInfo(property.Type).Type;
+
+      // Note: doesn't take co-/contravariance into account
+      if (typeOfType == propertyType) return;
+
+      var diagnostic = Diagnostic.Create(PropertyTypeRule, typeOf.GetLocation(), typeOf.Type, property.Type, name);
       addDiagnostic(diagnostic);
     }
 
