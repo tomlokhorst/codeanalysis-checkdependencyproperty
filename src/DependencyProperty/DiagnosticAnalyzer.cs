@@ -29,9 +29,6 @@ namespace DependencyPropertyNullable
       get { return ImmutableArray.Create(SyntaxKind.FieldDeclaration); }
     }
 
-    // public static readonly DependencyProperty ActiveScreenProperty =
-    //      DependencyProperty.Register("ActiveScreen", typeof(ScreenViewModel), typeof(MultiScreenView), new PropertyMetadata(null, activeScreenChanged));
-
     public void AnalyzeNode(SyntaxNode node, SemanticModel semanticModel, Action<Diagnostic> addDiagnostic, CancellationToken cancellationToken)
     {
       var field = node as FieldDeclarationSyntax;
@@ -57,9 +54,14 @@ namespace DependencyPropertyNullable
 
       if (mae.Name.Identifier.ValueText != "Register") return;
 
-      if (invoke.ArgumentList.Arguments.Count < 3) return;
+      if (invoke.ArgumentList.Arguments.Count < 4) return;
 
-      var typeOf = invoke.ArgumentList.Arguments[2].Expression as TypeOfExpressionSyntax;
+      checkOwnerType(classDecl, addDiagnostic, invoke.ArgumentList, semanticModel);
+    }
+
+    private void checkOwnerType(ClassDeclarationSyntax classDecl, Action<Diagnostic> addDiagnostic, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
+    {
+      var typeOf = registerArgumentList.Arguments[2].Expression as TypeOfExpressionSyntax;
       var correctOwnerType = semanticModel.GetTypeInfo(typeOf.Type).Type == semanticModel.GetDeclaredSymbol(classDecl);
 
       if (correctOwnerType) return;
