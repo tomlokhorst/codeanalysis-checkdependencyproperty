@@ -32,9 +32,13 @@ namespace DependencyPropertyNullable
     internal const string OwnerTypeMessageFormat = "Specified ownerType '{0}' doesn't match enclosing type '{1}'";
     internal static DiagnosticDescriptor OwnerTypeRule = new DiagnosticDescriptor(DiagnosticId, OwnerTypeDescription, OwnerTypeMessageFormat, Category, DiagnosticSeverity.Warning);
 
+    internal const string PropertyMetadataDescription = "Default value not valid";
+    internal const string PropertyMetadataMessageFormat = "Default value '{0}' isn't valid for type '{1}'";
+    internal static DiagnosticDescriptor PropertyMetadataRule = new DiagnosticDescriptor(DiagnosticId, PropertyMetadataDescription, PropertyMetadataMessageFormat, Category, DiagnosticSeverity.Warning);
+
     public ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
     {
-      get { return ImmutableArray.Create(OwnerTypeRule, NameExistsRule, NameDuplicateRule); }
+      get { return ImmutableArray.Create(OwnerTypeRule, NameExistsRule, NameDuplicateRule, PropertyMetadataRule); }
     }
 
     public ImmutableArray<SyntaxKind> SyntaxKindsOfInterest
@@ -82,6 +86,8 @@ namespace DependencyPropertyNullable
       checkPropertyType(classDecl, argumentList, addDiagnostic, semanticModel);
 
       checkOwnerType(classDecl, argumentList, addDiagnostic, semanticModel);
+
+      checkPropertyMetadatDefaultValue(classDecl, argumentList, addDiagnostic, semanticModel);
     }
 
     private void checkNameExists(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
@@ -135,11 +141,11 @@ namespace DependencyPropertyNullable
 
       var typeOf = registerArgumentList.Arguments[1].Expression as TypeOfExpressionSyntax;
       if (typeOf == null) return;
-      var typeOfType = semanticModel.GetTypeInfo(typeOf.Type).Type;
+      var typeOfType = semanticModel.GetTypeInfo(typeOf.Type).ConvertedType;
 
       var property = classDecl.Members.OfType<PropertyDeclarationSyntax>().FirstOrDefault(p => p.Identifier.ValueText == name);
       if (property == null) return;
-      var propertyType = semanticModel.GetTypeInfo(property.Type).Type;
+      var propertyType = semanticModel.GetTypeInfo(property.Type).ConvertedType;
 
       // Note: doesn't take co-/contravariance into account
       if (typeOfType == propertyType) return;
@@ -158,6 +164,33 @@ namespace DependencyPropertyNullable
       if (correctOwnerType) return;
 
       var diagnostic = Diagnostic.Create(OwnerTypeRule, typeOf.GetLocation(), typeOf.Type, classDecl.Identifier.ValueText);
+      addDiagnostic(diagnostic);
+    }
+
+    private void checkPropertyMetadatDefaultValue(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
+    {
+      var typeOf = registerArgumentList.Arguments[1].Expression as TypeOfExpressionSyntax;
+      if (typeOf == null) return;
+      var typeOfType = semanticModel.GetTypeInfo(typeOf.Type).ConvertedType;
+
+      var objectCreation = registerArgumentList.Arguments[3].Expression as ObjectCreationExpressionSyntax;
+      if (objectCreation == null) return;
+
+      // var objectCreationType = semanticModel.GetDeclaredConstructorSymbol(objectCreation.Type).Type;
+      // if (objectCreationType == null || objectCreationType.ToDisplayString() != "Windows.UI.Xaml.PropertyMetadata") return;
+
+      if (objectCreation.ArgumentList.Arguments.Count < 1) return;
+
+      var defaultValue = objectCreation.ArgumentList.Arguments[0].Expression;
+      var defaultValueType = semanticModel.GetTypeInfo(defaultValue).Type;
+
+      // Allow null literal for reference types
+      if (typeOfType.IsReferenceType && defaultValue.IsKind(SyntaxKind.NullLiteralExpression)) return;
+
+      // Note: doesn't take co-/contravariance into account
+      if (defaultValueType == typeOfType) return;
+
+      var diagnostic = Diagnostic.Create(PropertyMetadataRule, defaultValue.GetLocation(), defaultValue, typeOf.Type);
       addDiagnostic(diagnostic);
     }
   }
