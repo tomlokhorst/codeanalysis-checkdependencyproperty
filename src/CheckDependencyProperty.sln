@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30324.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DependencyProperty", "DependencyProperty\DependencyProperty.csproj", "{FE77218B-322C-4829-8DEC-E52913ACC10D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CheckDependencyProperty", "CheckDependencyProperty\CheckDependencyProperty.csproj", "{FE77218B-322C-4829-8DEC-E52913ACC10D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

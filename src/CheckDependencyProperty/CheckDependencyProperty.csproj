@@ -9,8 +9,8 @@
     <ProjectGuid>{FE77218B-322C-4829-8DEC-E52913ACC10D}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DependencyProperty</RootNamespace>
-    <AssemblyName>DependencyProperty</AssemblyName>
+    <RootNamespace>CheckDependencyProperty</RootNamespace>
+    <AssemblyName>CheckDependencyProperty</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <GeneratePkgDefFile>false</GeneratePkgDefFile>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>

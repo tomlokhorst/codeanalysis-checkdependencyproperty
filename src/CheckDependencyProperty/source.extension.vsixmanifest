@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Vsix Version="1.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2010">
-  <Identifier Id="DependencyProperty..272ce950-91bc-47b0-b1c3-020467db04f3">
-    <Name>DependencyProperty</Name>
+  <Identifier Id="CheckDependencyProperty..272ce950-91bc-47b0-b1c3-020467db04f3">
+    <Name>CheckDependencyProperty</Name>
     <Author>Tom Lokhorst</Author>
     <Version>1.0</Version>
     <Description xml:space="preserve">Diagnostic extension to some DependencyProperty conventions. For the .NET Compiler Platform ("Roslyn").</Description>

@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace DependencyPropertyNullable
+namespace CheckDependencyProperty
 {
   [DiagnosticAnalyzer]
   [ExportDiagnosticAnalyzer(DiagnosticId, LanguageNames.CSharp)]
