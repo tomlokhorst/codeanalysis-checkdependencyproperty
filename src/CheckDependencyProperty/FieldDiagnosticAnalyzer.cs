@@ -157,19 +157,20 @@ namespace CheckDependencyProperty
       var propertyType = semanticModel.GetTypeInfo(property.Type).ConvertedType;
 
       // Note: doesn't take co-/contravariance into account
-      if (typeOfType == propertyType) return null;
+      if (typeEquals(typeOfType, propertyType)) return null;
 
       return Diagnostic.Create(PropertyTypeRule, typeOf.GetLocation(), typeOf.Type, property.Type, name);
     }
 
     private Diagnostic checkOwnerType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
     {
+      var classType = semanticModel.GetDeclaredSymbol(classDecl);
+
       var typeOf = registerArgumentList.Arguments[2].Expression as TypeOfExpressionSyntax;
       if (typeOf == null) return null;
+      var typeOfType = semanticModel.GetTypeInfo(typeOf.Type).Type;
 
-      var correctOwnerType = semanticModel.GetTypeInfo(typeOf.Type).Type == semanticModel.GetDeclaredSymbol(classDecl);
-
-      if (correctOwnerType) return null;
+      if (typeEquals(typeOfType, classType)) return null;
 
       return Diagnostic.Create(OwnerTypeRule, typeOf.GetLocation(), typeOf.Type, classDecl.Identifier.ValueText);
     }
@@ -192,9 +193,16 @@ namespace CheckDependencyProperty
       if (typeOfType.IsReferenceType && defaultValue.IsKind(SyntaxKind.NullLiteralExpression)) return null;
 
       // Note: doesn't take co-/contravariance into account
-      if (defaultValueType == typeOfType) return null;
+      if (typeEquals(defaultValueType, typeOfType)) return null;
 
       return Diagnostic.Create(PropertyMetadataRule, defaultValue.GetLocation(), defaultValue, typeOf.Type);
+    }
+
+    private bool typeEquals(ITypeSymbol type1, ITypeSymbol type2)
+    {
+      // Note: type1 != type2 where both are generic types like List<string>
+      // Maybe there's a better way, but ToDisplayString() seems to work, for now
+      return type1.ToDisplayString() == type2.ToDisplayString();
     }
   }
 }
