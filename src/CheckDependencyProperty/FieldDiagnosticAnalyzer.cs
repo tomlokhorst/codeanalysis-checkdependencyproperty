@@ -80,36 +80,41 @@ namespace CheckDependencyProperty
 
       var argumentList = getArgumentList(field, semanticModel);
 
-      checkNameExists(classDecl, argumentList, addDiagnostic, semanticModel);
-      checkNameDuplicate(classDecl, field, argumentList, addDiagnostic, semanticModel);
+      Action<Diagnostic> diagnostic = (d) =>
+        {
+          if (d != null)
+            addDiagnostic(d);
+        };
 
-      checkPropertyType(classDecl, argumentList, addDiagnostic, semanticModel);
+      diagnostic(checkNameExists(classDecl, argumentList, semanticModel));
+      diagnostic(checkNameDuplicate(classDecl, field, argumentList, semanticModel));
 
-      checkOwnerType(classDecl, argumentList, addDiagnostic, semanticModel);
+      diagnostic(checkPropertyType(classDecl, argumentList, semanticModel));
 
-      checkPropertyMetadatDefaultValue(classDecl, argumentList, addDiagnostic, semanticModel);
+      diagnostic(checkOwnerType(classDecl, argumentList, semanticModel));
+
+      diagnostic(checkPropertyMetadatDefaultValue(classDecl, argumentList, semanticModel));
     }
 
-    private void checkNameExists(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
+    private Diagnostic checkNameExists(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
     {
       var stringLiteral = registerArgumentList.Arguments[0].Expression as LiteralExpressionSyntax;
-      if (stringLiteral == null || !stringLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return;
+      if (stringLiteral == null || !stringLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return null;
 
       var name = stringLiteral.Token.ValueText;
 
       var properties = classDecl.Members.OfType<PropertyDeclarationSyntax>();
       var propertyNameExists = properties.Any(p => p.Identifier.ValueText == name);
 
-      if (propertyNameExists) return;
+      if (propertyNameExists) return null;
 
-      var diagnostic = Diagnostic.Create(NameExistsRule, stringLiteral.GetLocation(), name);
-      addDiagnostic(diagnostic);
+      return Diagnostic.Create(NameExistsRule, stringLiteral.GetLocation(), name);
     }
 
-    private void checkNameDuplicate(ClassDeclarationSyntax classDecl, FieldDeclarationSyntax field, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
+    private Diagnostic checkNameDuplicate(ClassDeclarationSyntax classDecl, FieldDeclarationSyntax field, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
     {
       var stringLiteral = registerArgumentList.Arguments[0].Expression as LiteralExpressionSyntax;
-      if (stringLiteral == null || !stringLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return;
+      if (stringLiteral == null || !stringLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return null;
 
       var name = stringLiteral.Token.ValueText;
 
@@ -122,76 +127,73 @@ namespace CheckDependencyProperty
         .Where(l => l != null);
 
       var nameDuplicatesExist = nameLiterals.Any(l => l.Token.ValueText == name);
-      if (!nameDuplicatesExist) return;
+      if (!nameDuplicatesExist) return null;
 
       // If this field follows the *Property convention, ignore this one, the other duplicate wil show the message
       var followsConvention = field.Declaration.Variables.Any(v => v.Identifier.ValueText == name + "Property");
-      if (followsConvention) return;
+      if (followsConvention) return null;
 
-      var diagnostic = Diagnostic.Create(NameDuplicateRule, stringLiteral.GetLocation(), name);
-      addDiagnostic(diagnostic);
+      // There's also a checkNameExists exception, ignore this duplicate
+      var nameExists = checkNameExists(classDecl, registerArgumentList, semanticModel);
+      if (nameExists != null) return null;
+
+      return Diagnostic.Create(NameDuplicateRule, stringLiteral.GetLocation(), name);
     }
 
-    private void checkPropertyType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
+    private Diagnostic checkPropertyType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
     {
       var stringLiteral = registerArgumentList.Arguments[0].Expression as LiteralExpressionSyntax;
-      if (stringLiteral == null || !stringLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return;
+      if (stringLiteral == null || !stringLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return null;
 
       var name = stringLiteral.Token.ValueText;
 
       var typeOf = registerArgumentList.Arguments[1].Expression as TypeOfExpressionSyntax;
-      if (typeOf == null) return;
+      if (typeOf == null) return null;
       var typeOfType = semanticModel.GetTypeInfo(typeOf.Type).ConvertedType;
 
       var property = classDecl.Members.OfType<PropertyDeclarationSyntax>().FirstOrDefault(p => p.Identifier.ValueText == name);
-      if (property == null) return;
+      if (property == null) return null;
       var propertyType = semanticModel.GetTypeInfo(property.Type).ConvertedType;
 
       // Note: doesn't take co-/contravariance into account
-      if (typeOfType == propertyType) return;
+      if (typeOfType == propertyType) return null;
 
-      var diagnostic = Diagnostic.Create(PropertyTypeRule, typeOf.GetLocation(), typeOf.Type, property.Type, name);
-      addDiagnostic(diagnostic);
+      return Diagnostic.Create(PropertyTypeRule, typeOf.GetLocation(), typeOf.Type, property.Type, name);
     }
 
-    private void checkOwnerType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
+    private Diagnostic checkOwnerType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
     {
       var typeOf = registerArgumentList.Arguments[2].Expression as TypeOfExpressionSyntax;
-      if (typeOf == null) return;
+      if (typeOf == null) return null;
 
       var correctOwnerType = semanticModel.GetTypeInfo(typeOf.Type).Type == semanticModel.GetDeclaredSymbol(classDecl);
 
-      if (correctOwnerType) return;
+      if (correctOwnerType) return null;
 
-      var diagnostic = Diagnostic.Create(OwnerTypeRule, typeOf.GetLocation(), typeOf.Type, classDecl.Identifier.ValueText);
-      addDiagnostic(diagnostic);
+      return Diagnostic.Create(OwnerTypeRule, typeOf.GetLocation(), typeOf.Type, classDecl.Identifier.ValueText);
     }
 
-    private void checkPropertyMetadatDefaultValue(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, Action<Diagnostic> addDiagnostic, SemanticModel semanticModel)
+    private Diagnostic checkPropertyMetadatDefaultValue(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
     {
       var typeOf = registerArgumentList.Arguments[1].Expression as TypeOfExpressionSyntax;
-      if (typeOf == null) return;
+      if (typeOf == null) return null;
       var typeOfType = semanticModel.GetTypeInfo(typeOf.Type).ConvertedType;
 
       var objectCreation = registerArgumentList.Arguments[3].Expression as ObjectCreationExpressionSyntax;
-      if (objectCreation == null) return;
+      if (objectCreation == null) return null;
 
-      // var objectCreationType = semanticModel.GetDeclaredConstructorSymbol(objectCreation.Type).Type;
-      // if (objectCreationType == null || objectCreationType.ToDisplayString() != "Windows.UI.Xaml.PropertyMetadata") return;
-
-      if (objectCreation.ArgumentList.Arguments.Count < 1) return;
+      if (objectCreation.ArgumentList.Arguments.Count < 1) return null;
 
       var defaultValue = objectCreation.ArgumentList.Arguments[0].Expression;
       var defaultValueType = semanticModel.GetTypeInfo(defaultValue).Type;
 
       // Allow null literal for reference types
-      if (typeOfType.IsReferenceType && defaultValue.IsKind(SyntaxKind.NullLiteralExpression)) return;
+      if (typeOfType.IsReferenceType && defaultValue.IsKind(SyntaxKind.NullLiteralExpression)) return null;
 
       // Note: doesn't take co-/contravariance into account
-      if (defaultValueType == typeOfType) return;
+      if (defaultValueType == typeOfType) return null;
 
-      var diagnostic = Diagnostic.Create(PropertyMetadataRule, defaultValue.GetLocation(), defaultValue, typeOf.Type);
-      addDiagnostic(diagnostic);
+      return Diagnostic.Create(PropertyMetadataRule, defaultValue.GetLocation(), defaultValue, typeOf.Type);
     }
   }
 }
