@@ -11,9 +11,9 @@ namespace CheckDependencyProperty
 {
   [DiagnosticAnalyzer]
   [ExportDiagnosticAnalyzer(DiagnosticId, LanguageNames.CSharp)]
-  public class DiagnosticAnalyzer : ISyntaxNodeAnalyzer<SyntaxKind>
+  public class FieldDiagnosticAnalyzer : ISyntaxNodeAnalyzer<SyntaxKind>
   {
-    internal const string DiagnosticId = "DependencyProperty";
+    internal const string DiagnosticId = "FieldDependencyProperty";
     internal const string Category = "Conventions";
 
     internal const string NameExistsDescription = "Property name doesn't exist";
@@ -46,30 +46,6 @@ namespace CheckDependencyProperty
       get { return ImmutableArray.Create(SyntaxKind.FieldDeclaration); }
     }
 
-    private ArgumentListSyntax getArgumentList(FieldDeclarationSyntax field, SemanticModel semanticModel)
-    {
-      var typeName = semanticModel.GetTypeInfo(field.Declaration.Type).Type.ToDisplayString();
-      if (typeName != "Windows.UI.Xaml.DependencyProperty") return null;
-
-      var decl = field.Declaration.Variables.FirstOrDefault();
-      if (decl == null) return null;
-
-      var invoke = decl.Initializer.Value as InvocationExpressionSyntax;
-      if (invoke == null) return null;
-
-      var mae = invoke.Expression as MemberAccessExpressionSyntax;
-      if (mae == null) return null;
-
-      var typeSymbol = semanticModel.GetTypeInfo(mae.Expression).Type;
-      if (typeSymbol == null || typeSymbol.ToDisplayString() != "Windows.UI.Xaml.DependencyProperty") return null;
-
-      if (mae.Name.Identifier.ValueText != "Register") return null;
-
-      if (invoke.ArgumentList.Arguments.Count < 4) return null;
-
-      return invoke.ArgumentList;
-    }
-
     public void AnalyzeNode(SyntaxNode node, SemanticModel semanticModel, Action<Diagnostic> addDiagnostic, CancellationToken cancellationToken)
     {
       var field = node as FieldDeclarationSyntax;
@@ -78,7 +54,7 @@ namespace CheckDependencyProperty
       var classDecl = field.Parent as ClassDeclarationSyntax;
       if (classDecl == null) return;
 
-      var argumentList = getArgumentList(field, semanticModel);
+      var argumentList = GetArgumentList(field, semanticModel);
       if (argumentList == null) return;
 
       Action<Diagnostic> diagnostic = (d) =>
@@ -122,7 +98,7 @@ namespace CheckDependencyProperty
       var fields = classDecl.Members.OfType<FieldDeclarationSyntax>();
       var nameLiterals = fields
         .Where(f => f != field)
-        .Select(f => getArgumentList(f, semanticModel))
+        .Select(f => GetArgumentList(f, semanticModel))
         .Where(al => al != null)
         .Select(al => al.Arguments[0].Expression as LiteralExpressionSyntax)
         .Where(l => l != null);
@@ -200,9 +176,41 @@ namespace CheckDependencyProperty
 
     private bool typeEquals(ITypeSymbol type1, ITypeSymbol type2)
     {
+      // Most cases
+      if (type1 == type2)
+        return true;
+
+      // Null cases
+      if (type1 == null || type2 == null)
+        return false;
+
       // Note: type1 != type2 where both are generic types like List<string>
       // Maybe there's a better way, but ToDisplayString() seems to work, for now
       return type1.ToDisplayString() == type2.ToDisplayString();
+    }
+
+    public static ArgumentListSyntax GetArgumentList(FieldDeclarationSyntax field, SemanticModel semanticModel)
+    {
+      var typeName = semanticModel.GetTypeInfo(field.Declaration.Type).Type.ToDisplayString();
+      if (typeName != "Windows.UI.Xaml.DependencyProperty") return null;
+
+      var decl = field.Declaration.Variables.FirstOrDefault();
+      if (decl == null) return null;
+
+      var invoke = decl.Initializer.Value as InvocationExpressionSyntax;
+      if (invoke == null) return null;
+
+      var mae = invoke.Expression as MemberAccessExpressionSyntax;
+      if (mae == null) return null;
+
+      var typeSymbol = semanticModel.GetTypeInfo(mae.Expression).Type;
+      if (typeSymbol == null || typeSymbol.ToDisplayString() != "Windows.UI.Xaml.DependencyProperty") return null;
+
+      if (mae.Name.Identifier.ValueText != "Register") return null;
+
+      if (invoke.ArgumentList.Arguments.Count < 4) return null;
+
+      return invoke.ArgumentList;
     }
   }
 }
