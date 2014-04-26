@@ -51,9 +51,9 @@ namespace CheckDependencyProperty
 
       if (setter != null)
       {
-      //  var diagnostic = checkSetter(classDecl, setter, semanticModel);
-      //  if (diagnostic != null)
-      //    addDiagnostic(diagnostic);
+        var diagnostic = checkSetter(classDecl, property.Identifier.ValueText, setter, semanticModel);
+        if (diagnostic != null)
+          addDiagnostic(diagnostic);
       }
 
       var fields =
@@ -65,18 +65,6 @@ namespace CheckDependencyProperty
         select f;
       var field = fields.FirstOrDefault();
       if (field == null) return;
-    }
-
-    private FieldDeclarationSyntax getDpField(ClassDeclarationSyntax classDecl, string fieldName)
-    {
-      var fields =
-        from f in classDecl.Members.OfType<FieldDeclarationSyntax>()
-        where f.Declaration.Variables.Count > 0
-        let variable = f.Declaration.Variables[0]
-        where variable.Identifier.ValueText == fieldName
-        select f;
-
-      return fields.FirstOrDefault();
     }
 
     private Diagnostic checkGetter(ClassDeclarationSyntax classDecl, string propertyName, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
@@ -102,7 +90,52 @@ namespace CheckDependencyProperty
       var identifierArgument = arguments[0].Expression as IdentifierNameSyntax;
       if (identifierArgument == null) return null;
 
-      var field = getDpField(classDecl, identifierArgument.Identifier.ValueText);
+      var dependencyPropertyName = getDependencyPropertyName(classDecl, identifierArgument.Identifier.ValueText, semanticModel);
+      if (dependencyPropertyName == null) return null;
+
+      if (dependencyPropertyName == propertyName) return null;
+
+      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), dependencyPropertyName, propertyName);
+    }
+
+    private Diagnostic checkSetter(ClassDeclarationSyntax classDecl, string propertyName, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
+    {
+      var statements = accessor.Body.Statements;
+      if (statements.Count != 1) return null;
+
+      var expressionStatement = statements[0] as ExpressionStatementSyntax;
+      if (expressionStatement == null) return null;
+
+      var invocation = expressionStatement.Expression as InvocationExpressionSyntax;
+      if (invocation == null) return null;
+
+      var symbolInfo = semanticModel.GetSymbolInfo(invocation.Expression).Symbol;
+      if (symbolInfo.ToDisplayString() != "Windows.UI.Xaml.DependencyObject.SetValue(Windows.UI.Xaml.DependencyProperty, object)") return null;
+
+      var arguments = invocation.ArgumentList.Arguments;
+      if (arguments.Count != 2) return null;
+
+      var identifierArgument = arguments[0].Expression as IdentifierNameSyntax;
+      if (identifierArgument == null) return null;
+
+      var dependencyPropertyName = getDependencyPropertyName(classDecl, identifierArgument.Identifier.ValueText, semanticModel);
+      if (dependencyPropertyName == null) return null;
+
+      if (dependencyPropertyName == propertyName) return null;
+
+      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), dependencyPropertyName, propertyName);
+    }
+
+    private string getDependencyPropertyName(ClassDeclarationSyntax classDecl, string fieldName, SemanticModel semanticModel)
+    {
+      var fields =
+        from f in classDecl.Members.OfType<FieldDeclarationSyntax>()
+        where f.Declaration.Variables.Count > 0
+        let variable = f.Declaration.Variables[0]
+        where variable.Identifier.ValueText == fieldName
+        select f;
+
+      var field = fields.FirstOrDefault();
       if (field == null) return null;
 
       var registerArguments = FieldDiagnosticAnalyzer.GetArgumentList(field, semanticModel);
@@ -110,11 +143,8 @@ namespace CheckDependencyProperty
 
       var nameLiteral = registerArguments.Arguments[0].Expression as LiteralExpressionSyntax;
       if (nameLiteral == null || !nameLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return null;
-      var nameValueText = nameLiteral.Token.ValueText;
 
-      if (nameValueText == propertyName) return null;
-
-      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), nameValueText, propertyName);
+      return nameLiteral.Token.ValueText;
     }
   }
 }
