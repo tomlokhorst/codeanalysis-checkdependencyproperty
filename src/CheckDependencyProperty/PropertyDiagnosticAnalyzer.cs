@@ -93,7 +93,7 @@ namespace CheckDependencyProperty
 
       if (nameLiteralValueText == propertyName) return null;
 
-      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), ImmutableArray.Create(nameLiteral.GetLocation()), fieldName, nameLiteralValueText, propertyName);
+      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), ImmutableArray.Create(field.GetLocation()), fieldName, nameLiteralValueText, propertyName);
     }
 
     private IdentifierNameSyntax identifierFromGetter(ClassDeclarationSyntax classDecl, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)

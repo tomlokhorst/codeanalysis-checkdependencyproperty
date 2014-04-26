@@ -103,8 +103,8 @@ namespace CheckDependencyProperty
         .Select(al => al.Arguments[0].Expression as LiteralExpressionSyntax)
         .Where(l => l != null);
 
-      var nameDuplicatesExist = nameLiterals.Any(l => l.Token.ValueText == name);
-      if (!nameDuplicatesExist) return null;
+      var nameDuplicate = nameLiterals.FirstOrDefault(l => l.Token.ValueText == name);
+      if (nameDuplicate == null) return null;
 
       // If this field follows the *Property convention, ignore this one, the other duplicate wil show the message
       var followsConvention = field.Declaration.Variables.Any(v => v.Identifier.ValueText == name + "Property");
@@ -114,7 +114,7 @@ namespace CheckDependencyProperty
       var nameExists = checkNameExists(classDecl, registerArgumentList, semanticModel);
       if (nameExists != null) return null;
 
-      return Diagnostic.Create(NameDuplicateRule, stringLiteral.GetLocation(), name);
+      return Diagnostic.Create(NameDuplicateRule, stringLiteral.GetLocation(), ImmutableArray.Create(nameDuplicate.GetLocation()), name);
     }
 
     private Diagnostic checkPropertyType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
@@ -135,7 +135,7 @@ namespace CheckDependencyProperty
       // Note: doesn't take co-/contravariance into account
       if (typeEquals(typeOfType, propertyType)) return null;
 
-      return Diagnostic.Create(PropertyTypeRule, typeOf.GetLocation(), typeOf.Type, property.Type, name);
+      return Diagnostic.Create(PropertyTypeRule, typeOf.GetLocation(), ImmutableArray.Create(property.Type.GetLocation()), typeOf.Type, property.Type, name);
     }
 
     private Diagnostic checkOwnerType(ClassDeclarationSyntax classDecl, ArgumentListSyntax registerArgumentList, SemanticModel semanticModel)
@@ -171,7 +171,7 @@ namespace CheckDependencyProperty
       // Note: doesn't take co-/contravariance into account
       if (typeEquals(defaultValueType, typeOfType)) return null;
 
-      return Diagnostic.Create(PropertyMetadataRule, defaultValue.GetLocation(), defaultValue, typeOf.Type);
+      return Diagnostic.Create(PropertyMetadataRule, defaultValue.GetLocation(), ImmutableArray.Create(typeOf.GetLocation()), defaultValue, typeOf.Type);
     }
 
     private bool typeEquals(ITypeSymbol type1, ITypeSymbol type2)
