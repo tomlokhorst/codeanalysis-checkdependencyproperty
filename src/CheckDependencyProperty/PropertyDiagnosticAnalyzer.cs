@@ -17,7 +17,7 @@ namespace CheckDependencyProperty
     internal const string Category = "Conventions";
 
     internal const string DiagnosticDescription = "DependencyProperty refers to different property";
-    internal const string DiagnosticMessageFormat = "DependencyProperty refers to '{0}' instead of this property ('{1}')";
+    internal const string DiagnosticMessageFormat = "DependencyProperty '{0}' refers to '{1}' instead of this property '{2}'";
     internal static DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, DiagnosticDescription, DiagnosticMessageFormat, Category, DiagnosticSeverity.Warning);
 
     public ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
@@ -44,14 +44,16 @@ namespace CheckDependencyProperty
 
       if (getter != null)
       {
-        var diagnostic = checkGetter(classDecl, property.Identifier.ValueText, getter, semanticModel);
+        var identifier = identifierFromGetter(classDecl, getter, semanticModel);
+        var diagnostic = checkField(classDecl, property.Identifier.ValueText, identifier, semanticModel);
         if (diagnostic != null)
           addDiagnostic(diagnostic);
       }
 
       if (setter != null)
       {
-        var diagnostic = checkSetter(classDecl, property.Identifier.ValueText, setter, semanticModel);
+        var identifier = identifierFromSetter(classDecl, setter, semanticModel);
+        var diagnostic = checkField(classDecl, property.Identifier.ValueText, identifier, semanticModel);
         if (diagnostic != null)
           addDiagnostic(diagnostic);
       }
@@ -67,7 +69,34 @@ namespace CheckDependencyProperty
       if (field == null) return;
     }
 
-    private Diagnostic checkGetter(ClassDeclarationSyntax classDecl, string propertyName, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
+    private Diagnostic checkField(ClassDeclarationSyntax classDecl, string propertyName, IdentifierNameSyntax identifierArgument, SemanticModel semanticModel)
+    {
+      if (identifierArgument == null) return null;
+      var fieldName = identifierArgument.Identifier.ValueText;
+
+      var fields =
+        from f in classDecl.Members.OfType<FieldDeclarationSyntax>()
+        where f.Declaration.Variables.Count > 0
+        let variable = f.Declaration.Variables[0]
+        where variable.Identifier.ValueText == fieldName
+        select f;
+
+      var field = fields.FirstOrDefault();
+      if (field == null) return null;
+
+      var registerArguments = FieldDiagnosticAnalyzer.GetArgumentList(field, semanticModel);
+      if (registerArguments == null) return null;
+
+      var nameLiteral = registerArguments.Arguments[0].Expression as LiteralExpressionSyntax;
+      if (nameLiteral == null || !nameLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return null;
+      var nameLiteralValueText = nameLiteral.Token.ValueText;
+
+      if (nameLiteralValueText == propertyName) return null;
+
+      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), ImmutableArray.Create(nameLiteral.GetLocation()), fieldName, nameLiteralValueText, propertyName);
+    }
+
+    private IdentifierNameSyntax identifierFromGetter(ClassDeclarationSyntax classDecl, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
     {
       var statements = accessor.Body.Statements;
       if (statements.Count != 1) return null;
@@ -88,17 +117,11 @@ namespace CheckDependencyProperty
       if (arguments.Count != 1) return null;
 
       var identifierArgument = arguments[0].Expression as IdentifierNameSyntax;
-      if (identifierArgument == null) return null;
 
-      var dependencyPropertyName = getDependencyPropertyName(classDecl, identifierArgument.Identifier.ValueText, semanticModel);
-      if (dependencyPropertyName == null) return null;
-
-      if (dependencyPropertyName == propertyName) return null;
-
-      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), dependencyPropertyName, propertyName);
+      return identifierArgument;
     }
 
-    private Diagnostic checkSetter(ClassDeclarationSyntax classDecl, string propertyName, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
+    private IdentifierNameSyntax identifierFromSetter(ClassDeclarationSyntax classDecl, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
     {
       var statements = accessor.Body.Statements;
       if (statements.Count != 1) return null;
@@ -116,35 +139,8 @@ namespace CheckDependencyProperty
       if (arguments.Count != 2) return null;
 
       var identifierArgument = arguments[0].Expression as IdentifierNameSyntax;
-      if (identifierArgument == null) return null;
 
-      var dependencyPropertyName = getDependencyPropertyName(classDecl, identifierArgument.Identifier.ValueText, semanticModel);
-      if (dependencyPropertyName == null) return null;
-
-      if (dependencyPropertyName == propertyName) return null;
-
-      return Diagnostic.Create(Rule, identifierArgument.GetLocation(), dependencyPropertyName, propertyName);
-    }
-
-    private string getDependencyPropertyName(ClassDeclarationSyntax classDecl, string fieldName, SemanticModel semanticModel)
-    {
-      var fields =
-        from f in classDecl.Members.OfType<FieldDeclarationSyntax>()
-        where f.Declaration.Variables.Count > 0
-        let variable = f.Declaration.Variables[0]
-        where variable.Identifier.ValueText == fieldName
-        select f;
-
-      var field = fields.FirstOrDefault();
-      if (field == null) return null;
-
-      var registerArguments = FieldDiagnosticAnalyzer.GetArgumentList(field, semanticModel);
-      if (registerArguments == null) return null;
-
-      var nameLiteral = registerArguments.Arguments[0].Expression as LiteralExpressionSyntax;
-      if (nameLiteral == null || !nameLiteral.IsKind(SyntaxKind.StringLiteralExpression)) return null;
-
-      return nameLiteral.Token.ValueText;
+      return identifierArgument;
     }
   }
 }
