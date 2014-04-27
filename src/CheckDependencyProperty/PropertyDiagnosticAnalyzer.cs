@@ -57,16 +57,6 @@ namespace CheckDependencyProperty
         if (diagnostic != null)
           addDiagnostic(diagnostic);
       }
-
-      var fields =
-        from f in classDecl.Members.OfType<FieldDeclarationSyntax>()
-        let args = FieldDiagnosticAnalyzer.GetArgumentList(f, semanticModel)
-        where args != null
-        let lit = args.Arguments[0].Expression as LiteralExpressionSyntax
-        where lit.Token.ValueText == property.Identifier.ValueText
-        select f;
-      var field = fields.FirstOrDefault();
-      if (field == null) return;
     }
 
     private Diagnostic checkField(ClassDeclarationSyntax classDecl, string propertyName, IdentifierNameSyntax identifierArgument, SemanticModel semanticModel)
@@ -98,6 +88,8 @@ namespace CheckDependencyProperty
 
     private IdentifierNameSyntax identifierFromGetter(ClassDeclarationSyntax classDecl, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
     {
+      if (accessor.Body == null) return null;
+
       var statements = accessor.Body.Statements;
       if (statements.Count != 1) return null;
 
@@ -123,6 +115,8 @@ namespace CheckDependencyProperty
 
     private IdentifierNameSyntax identifierFromSetter(ClassDeclarationSyntax classDecl, AccessorDeclarationSyntax accessor, SemanticModel semanticModel)
     {
+      if (accessor.Body == null) return null;
+
       var statements = accessor.Body.Statements;
       if (statements.Count != 1) return null;
 
